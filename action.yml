@@ -30,19 +30,19 @@ runs:
           name=$(basename "$file")
 
           # Skip ignored filenames
-          if [[ -n "${{ inputs.ignore }}" && "$name" =~ ${{ inputs.ignore }} ]]; then
+          if [ -n "$ignore" ] && echo "$name" | grep -Eq "$ignore"; then
             continue
           fi
 
           # Check pattern
-          if [[ "$name" =~ ${{ inputs.pattern }} ]]; then
+          if echo "$name" | grep -Eq "$pattern"; then
             invalid="$invalid\n$file"
           fi
         done < <(git ls-files)
 
         if [ -n "$invalid" ]; then
           echo "❌ nombresArchivosMal:"
-          echo "$invalid" | sed 's/^/ - /'
+          echo -e "$invalid" | sed '/^$/d' | sed 's/^/ - /'
           exit 1
         fi
 
