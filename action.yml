@@ -12,6 +12,11 @@ inputs:
     required: false
     default: '[A-Z]|[ ]|[áéíóúÁÉÍÓÚ]'
 
+  ignore:
+    description: "Regex for files to ignore"
+    required: false
+    default: '^README\.md$'
+
 runs:
   using: "composite"
   steps:
@@ -19,6 +24,12 @@ runs:
       shell: bash
       run: |
         files=$(git ls-files)
+
+        # Remove ignored files
+        if [ -n "${{ inputs.ignore }}" ]; then
+          files=$(echo "$files" | grep -Ev "${{ inputs.ignore }}")
+        fi
+
         invalid=$(echo "$files" | grep -E "${{ inputs.pattern }}" || true)
 
         if [ -n "$invalid" ]; then
