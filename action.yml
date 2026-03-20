@@ -23,28 +23,26 @@ runs:
     - name: Check filenames
       shell: bash
       run: |
-        echo "Checking filenames..."
 
-        pattern='${{ inputs.pattern }}'
-        ignore='${{ inputs.ignore }}'
+        pattern="${{ inputs.pattern }}"
+        ignore="${{ inputs.ignore }}"
 
         invalid=""
 
         while IFS= read -r file; do
           name=$(basename "$file")
 
-          # Ignore rules (use FULL PATH here)
+          # Skip ignored filenames
           if [ -n "$ignore" ]; then
             if echo "$file" | grep -Eq -- "$ignore"; then
               continue
             fi
           fi
 
-          # ❗ invalid = NOT matching kebab-case
-          if ! echo "$name" | grep -Eq -- "$pattern"; then
+          # Check pattern (invertido correctamente)
+          if ! echo "$name" | grep -Eq "$pattern"; then
             invalid="$invalid\n$file"
           fi
-
         done < <(git ls-files)
 
         if [ -n "$invalid" ]; then
