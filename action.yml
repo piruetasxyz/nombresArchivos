@@ -15,7 +15,7 @@ inputs:
   ignore:
     description: "Regex for files to ignore"
     required: false
-    default: '(^|/)README\.md|LICENSE|\.gitignore)$|^\.github/'
+    default: '(^|/)(README\.md|LICENSE|\.gitignore)$|^\.github/'
 
 runs:
   using: "composite"
