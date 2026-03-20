@@ -1,0 +1,25 @@
+name: "nombresArchivos"
+description: "no permite mayúsculas, espacios y acentos en nombres de archivo"
+
+inputs:
+  pattern:
+    description: "Regex for invalid filenames"
+    required: false
+    default: '[A-Z]|[ ]|[áéíóúÁÉÍÓÚ]'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check filenames
+      shell: bash
+      run: |
+        files=$(git ls-files)
+        invalid=$(echo "$files" | grep -E "${{ inputs.pattern }}" || true)
+
+        if [ -n "$invalid" ]; then
+          echo "❌ nombresArchivosMal:"
+          echo "$invalid" | sed 's/^/ - /'
+          exit 1
+        fi
+
+        echo "✅ nombresArchivosBien"
