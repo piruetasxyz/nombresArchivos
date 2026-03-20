@@ -15,7 +15,7 @@ inputs:
   ignore:
     description: "Regex for files to ignore"
     required: false
-    default: '^README\.md$'
+    default: '^(README\.md|LICENSE)$'
 
 runs:
   using: "composite"
@@ -30,8 +30,10 @@ runs:
           name=$(basename "$file")
 
           # Skip ignored filenames
-          if [ -n "$ignore" ] && echo "$name" | grep -Eq "$ignore"; then
-            continue
+          if [ -n "$ignore" ]; then
+            if echo "$name" | grep -Eq -- "$ignore"; then
+              continue
+            fi
           fi
 
           # Check pattern
