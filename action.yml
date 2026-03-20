@@ -1,21 +1,21 @@
 name: "nombresArchivos"
-description: "no permite mayúsculas, espacios y acentos en nombres de archivo"
+description: "enforce kebab-case en nombres de archivo"
 author: "piruetasxyz"
+
 branding: 
   color: purple
   icon: file
-  
 
 inputs:
   pattern:
-    description: "Regex for invalid filenames"
+    description: "Regex for valid filenames (kebab-case)"
     required: false
-    default: '[A-Z]|[ ]|[áéíóúÁÉÍÓÚ]'
+    default: '^[a-z0-9]+([._-][a-z0-9]+)*$'
 
   ignore:
     description: "Regex for files to ignore"
     required: false
-    default: '^(README\.md|LICENSE)$'
+    default: '^(README\.md|LICENSE|\.gitignore)$|^\.github/'
 
 runs:
   using: "composite"
@@ -23,23 +23,28 @@ runs:
     - name: Check filenames
       shell: bash
       run: |
+        echo "Checking filenames..."
+
+        pattern='${{ inputs.pattern }}'
+        ignore='${{ inputs.ignore }}'
 
         invalid=""
 
         while IFS= read -r file; do
           name=$(basename "$file")
 
-          # Skip ignored filenames
+          # Ignore rules (use FULL PATH here)
           if [ -n "$ignore" ]; then
-            if echo "$name" | grep -Eq -- "$ignore"; then
+            if echo "$file" | grep -Eq -- "$ignore"; then
               continue
             fi
           fi
 
-          # Check pattern
-          if echo "$name" | grep -Eq "$pattern"; then
+          # ❗ invalid = NOT matching kebab-case
+          if ! echo "$name" | grep -Eq -- "$pattern"; then
             invalid="$invalid\n$file"
           fi
+
         done < <(git ls-files)
 
         if [ -n "$invalid" ]; then
