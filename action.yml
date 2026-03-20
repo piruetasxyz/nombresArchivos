@@ -1,6 +1,10 @@
 name: "nombresArchivos"
 description: "no permite mayúsculas, espacios y acentos en nombres de archivo"
 author: "piruetasxyz"
+branding: 
+  color: purple
+  icon: file
+  
 
 inputs:
   pattern:
