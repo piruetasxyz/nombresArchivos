@@ -1,5 +1,6 @@
 name: "nombresArchivos"
 description: "no permite mayúsculas, espacios y acentos en nombres de archivo"
+author: "piruetasxyz"
 
 inputs:
   pattern:
