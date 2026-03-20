@@ -23,14 +23,22 @@ runs:
     - name: Check filenames
       shell: bash
       run: |
-        files=$(git ls-files)
 
-        # Remove ignored files
-        if [ -n "${{ inputs.ignore }}" ]; then
-          files=$(echo "$files" | grep -Ev "${{ inputs.ignore }}")
-        fi
+        invalid=""
 
-        invalid=$(echo "$files" | grep -E "${{ inputs.pattern }}" || true)
+        while IFS= read -r file; do
+          name=$(basename "$file")
+
+          # Skip ignored filenames
+          if [[ -n "${{ inputs.ignore }}" && "$name" =~ ${{ inputs.ignore }} ]]; then
+            continue
+          fi
+
+          # Check pattern
+          if [[ "$name" =~ ${{ inputs.pattern }} ]]; then
+            invalid="$invalid\n$file"
+          fi
+        done < <(git ls-files)
 
         if [ -n "$invalid" ]; then
           echo "❌ nombresArchivosMal:"
