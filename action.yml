@@ -1,5 +1,5 @@
 name: "nombresArchivos"
-description: "enforce kebab-case en nombres de archivo"
+description: "verifica y opcionalmente corrige nombres de archivos a kebab-case"
 author: "piruetasxyz"
 
 branding: 
@@ -8,47 +8,88 @@ branding:
 
 inputs:
   pattern:
-    description: "Regex for valid filenames (kebab-case)"
+    description: "regex para nombres válidos (kebab-case)"
     required: false
-    default: '^[a-z0-9]+([._-][a-z0-9]+)*$'
+    default: '^[a-z0-9]+([.-][a-z0-9]+)*$'
 
   ignore:
-    description: "Regex for files to ignore"
+    description: "regex para archivos a ignorar"
     required: false
     default: '(^|/)(README\.md|LICENSE|\.gitignore)$|^\.github/'
+
+  arreglar:
+    description: "corrige automáticamente los nombres a kebab-case"
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
   steps:
-    - name: Check filenames
+    - name: Verificar / Corregir nombres de archivos
       shell: bash
       run: |
 
         pattern="${{ inputs.pattern }}"
         ignore="${{ inputs.ignore }}"
+        arreglar="${{ inputs.arreglar }}"
 
         invalid=""
 
-        while IFS= read -r file; do
-          name=$(basename "$file")
+        normalizar() {
+          echo "$1" \
+            | iconv -f utf8 -t ascii//TRANSLIT 2>/dev/null \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[[:space:]]+/-/g' \
+            | sed -E 's/[^a-z0-9._-]//g' \
+            | sed -E 's/[._-]+/-/g' \
+            | sed -E 's/^-+|-+$//g'
+        }
 
-          # Skip ignored filenames
+        while IFS= read -r file; do
+          nombre=$(basename "$file")
+          directorio=$(dirname "$file")
+
+          # Omitir archivos ignorados
           if [ -n "$ignore" ]; then
             if echo "$file" | grep -Eq -- "$ignore"; then
               continue
             fi
           fi
 
-          # Check pattern (invertido correctamente)
-          if ! echo "$name" | grep -Eq "$pattern"; then
+          nuevo_nombre="$nombre"
+
+          if [ "$arreglar" = "true" ]; then
+            nuevo_nombre=$(normalizar "$nombre")
+
+            if [ -z "$nuevo_nombre" ]; then
+              echo "⚠️ Se omite porque quedaría vacío: $file"
+              continue
+            fi
+
+            if [ "$nombre" != "$nuevo_nombre" ]; then
+              nueva_ruta="$directorio/$nuevo_nombre"
+
+              echo "🔧 Renombrando:"
+              echo "   $file"
+              echo "   → $nueva_ruta"
+
+              git mv "$file" "$nueva_ruta"
+              file="$nueva_ruta"
+              nombre="$nuevo_nombre"
+            fi
+          fi
+
+          # Validar después de corregir (o el original si no se corrige)
+          if ! echo "$nombre" | grep -Eq "$pattern"; then
             invalid="$invalid\n$file"
           fi
+
         done < <(git ls-files)
 
         if [ -n "$invalid" ]; then
-          echo "❌ nombresArchivosMal:"
+          echo "❌ Nombres de archivos inválidos:"
           echo -e "$invalid" | sed '/^$/d' | sed 's/^/ - /'
           exit 1
         fi
 
-        echo "✅ nombresArchivosBien"
+        echo "✅ Todos los nombres de archivos son válidos"
