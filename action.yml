@@ -45,51 +45,109 @@ runs:
             | sed -E 's/^-+|-+$//g'
         }
 
-        while IFS= read -r file; do
+        split_nombre() {
+          nombre="$1"
+
+          case "$nombre" in
+            *.tar.gz) base="${nombre%.tar.gz}"; ext="tar.gz" ;;
+            *.tar.bz2) base="${nombre%.tar.bz2}"; ext="tar.bz2" ;;
+            *.tar.xz) base="${nombre%.tar.xz}"; ext="tar.xz" ;;
+            *.min.js) base="${nombre%.min.js}"; ext="min.js" ;;
+            *.min.css) base="${nombre%.min.css}"; ext="min.css" ;;
+            *)
+              base="${nombre%.*}"
+              ext="${nombre##*.}"
+              if [ "$base" = "$ext" ]; then
+                ext=""
+              fi
+              ;;
+          esac
+        }
+
+        ########################################
+        # 🔥 Detectar archivos a procesar
+        ########################################
+
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          echo "🔍 Modo PR: comparando contra $GITHUB_BASE_REF"
+          archivos=$(git diff --name-only origin/$GITHUB_BASE_REF...HEAD)
+        else
+          echo "🔍 Modo push: usando último commit"
+          archivos=$(git diff --name-only HEAD~1 HEAD)
+        fi
+
+        # fallback si está vacío
+        if [ -z "$archivos" ]; then
+          echo "ℹ️ No hay diff, usando todos los archivos"
+          archivos=$(git ls-files)
+        fi
+
+        ########################################
+        # 🚀 Procesar archivos
+        ########################################
+
+        echo "$archivos" | while IFS= read -r file; do
+
+          # evitar líneas vacías
+          [ -z "$file" ] && continue
+
           nombre=$(basename "$file")
           directorio=$(dirname "$file")
 
-          # Omitir archivos ignorados
-          if [ -n "$ignore" ]; then
-            if echo "$file" | grep -Eq -- "$ignore"; then
-              continue
-            fi
+          if echo "$file" | grep -Eq -- "$ignore"; then
+            continue
           fi
 
-          nuevo_nombre="$nombre"
-
           if [ "$arreglar" = "true" ]; then
-            nuevo_nombre=$(normalizar "$nombre")
+
+            split_nombre "$nombre"
+
+            if [ -z "$ext" ]; then
+              nuevo_nombre=$(normalizar "$nombre")
+            else
+              base_norm=$(normalizar "$base")
+              ext_norm=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+              nuevo_nombre="$base_norm.$ext_norm"
+            fi
 
             if [ -z "$nuevo_nombre" ]; then
               echo "⚠️ Se omite porque quedaría vacío: $file"
               continue
             fi
 
-            if [ "$nombre" != "$nuevo_nombre" ]; then
-              nueva_ruta="$directorio/$nuevo_nombre"
+            nueva_ruta="$directorio/$nuevo_nombre"
 
+            if [ "$file" != "$nueva_ruta" ] && git ls-files --error-unmatch "$nueva_ruta" >/dev/null 2>&1; then
+              echo "❌ Colisión detectada:"
+              echo "   $file"
+              echo "   → $nueva_ruta"
+              exit 1
+            fi
+
+            if [ "$nombre" != "$nuevo_nombre" ]; then
               echo "🔧 Renombrando:"
               echo "   $file"
               echo "   → $nueva_ruta"
 
               git mv "$file" "$nueva_ruta"
-              file="$nueva_ruta"
               nombre="$nuevo_nombre"
             fi
           fi
 
-          # Validar después de corregir (o el original si no se corrige)
           if ! echo "$nombre" | grep -Eq "$pattern"; then
             invalid="$invalid\n$file"
           fi
 
-        done < <(git ls-files)
+        done
+
+        ########################################
+        # 🧾 Resultado
+        ########################################
 
         if [ -n "$invalid" ]; then
-          echo "❌ Nombres de archivos inválidos:"
+          echo "❌ Nombres inválidos:"
           echo -e "$invalid" | sed '/^$/d' | sed 's/^/ - /'
           exit 1
         fi
 
-        echo "✅ Todos los nombres de archivos son válidos"
+        echo "✅ Todo correcto"
