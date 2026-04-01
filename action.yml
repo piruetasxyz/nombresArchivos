@@ -20,7 +20,12 @@ inputs:
   arreglar:
     description: "corrige automáticamente los nombres a kebab-case"
     required: false
-    default: "false"
+    default: "true"
+
+  commit:
+    description: "hace commit y push de los archivos renombrados (requiere arreglar: true)"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
@@ -32,8 +37,10 @@ runs:
         pattern="${{ inputs.pattern }}"
         ignore="${{ inputs.ignore }}"
         arreglar="${{ inputs.arreglar }}"
+        commit="${{ inputs.commit }}"
 
         invalid=""
+        renamed=0
 
         normalizar() {
           echo "$1" \
@@ -86,7 +93,7 @@ runs:
         # 🚀 Procesar archivos
         ########################################
 
-        echo "$archivos" | while IFS= read -r file; do
+        while IFS= read -r file; do
 
           # evitar líneas vacías
           [ -z "$file" ] && continue
@@ -131,6 +138,7 @@ runs:
 
               git mv "$file" "$nueva_ruta"
               nombre="$nuevo_nombre"
+              renamed=1
             fi
           fi
 
@@ -138,7 +146,24 @@ runs:
             invalid="$invalid\n$file"
           fi
 
-        done
+        done < <(echo "$archivos")
+
+        ########################################
+        # 💾 Commit y push si hubo renombrados
+        ########################################
+
+        if [ "$arreglar" = "true" ] && [ "$commit" = "true" ] && [ "$renamed" = "1" ]; then
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git commit -m "fix: normalizar nombres de archivos a kebab-case"; then
+            echo "❌ Error al hacer commit"
+            exit 1
+          fi
+          if ! git push; then
+            echo "❌ Error al hacer push (verifica que el token tenga permisos de escritura)"
+            exit 1
+          fi
+        fi
 
         ########################################
         # 🧾 Resultado
